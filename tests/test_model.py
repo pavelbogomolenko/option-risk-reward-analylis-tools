@@ -1,5 +1,6 @@
 import pytest
 
+from dateutil.parser import parse
 from optionrra.model import ContractType, OptionContract, OptionType, Position, StockContract
 
 
@@ -28,13 +29,38 @@ def test_build_option_contract_from_string(test_input):
     assert o.option_type == OptionType[ot.upper()]
 
 
+def test_not_a_valid_option_string():
+    with pytest.raises(ValueError):
+        OptionContract.from_str("+1 95 put")
+
+
+@pytest.mark.parametrize("test_input", ["+1 95 put 6.25 2023-03-15", "-1 105 call 9.25 2024-03-15", "+1 110 call 8.0"])
+def test_build_option_contract_from_string_with_optional_expiration_date(test_input):
+    o = OptionContract.from_str(test_input)
+    params = test_input.split(" ")
+    count = int(params[0])
+    contract_type = ContractType.LONG if int(count) > 0 else ContractType.SHORT
+    strike = float(params[1])
+    option_type = OptionType[params[2].upper()]
+    premium = float(params[3])
+    exp_date = parse(params[4]) if len(params) > 4 else None
+
+    assert o.count == abs(count)
+    assert o.type == contract_type
+    assert o.strike_price == strike
+    assert o.premium == premium
+    assert o.option_type == option_type
+    assert o.expiration_date() == exp_date
+
+
 @pytest.mark.parametrize("test_input", ["+1 stock 95", "-1 stock 100"])
 def test_build_stock_contract_from_string(test_input):
-    o = StockContract.from_str(test_input)
-    c, _, p = test_input.split(" ")
-    assert o.count == abs(int(c))
-    assert o.type == ContractType.LONG if int(c) > 0 else ContractType.SHORT
-    assert o.get_price() == float(p)
+    c = StockContract.from_str(test_input)
+    count, _, p = test_input.split(" ")
+    assert c.count == abs(int(count))
+    assert c.type == ContractType.LONG if int(count) > 0 else ContractType.SHORT
+    assert c.get_price() == float(p)
+    assert c.expiration_date() is None
 
 
 @pytest.mark.parametrize("test_input, expected", [
@@ -135,3 +161,49 @@ def test_position_contracts_are_sorted_by_price():
     expected_contracts = ["+1 80.0 call 3.5", "+1 85.0 call 5.5", "+1 90.0 call 9.5"]
     assert position.to_str_list() == expected_contracts
 
+
+def test_position_min_strike():
+    contracts = ["+1 90 put 9.5", "+1 85 call 5.5", "+1 80 call 3.5"]
+    pos = Position.from_str_list(contracts)
+    assert pos.min_strike == 80
+
+
+def test_position_max_strike():
+    contracts = ["+1 90 put 9.5", "+1 85 call 5.5", "+1 80 call 3.5"]
+    pos = Position.from_str_list(contracts)
+    assert pos.max_strike == 90
+
+
+def test_position_min_expiration_date():
+    contracts = ["+1 90 put 9.5 2023-06-15", "+1 85 call 5.5 2023-05-15", "+1 80 call 3.5 2023-05-10"]
+    pos = Position.from_str_list(contracts)
+    assert pos.min_expiration_date == parse("2023-05-10")
+
+
+def test_position_max_expiration_date():
+    contracts = ["+1 90 put 9.5 2023-06-15", "+1 85 call 5.5 2023-05-15", "+1 80 call 3.5 2023-05-10"]
+    pos = Position.from_str_list(contracts)
+    assert pos.max_expiration_date == parse("2023-06-15")
+
+
+@pytest.mark.parametrize("test_input, expected", [
+    (
+            ["+1 95 call 6.25", "-1 105 call 1.75", "-2 105 put 7.75"],
+            -6.25+1.75+2*7.75
+    ),
+    (
+            ["+1 95 call 6.25", "-1 105 call 1.75", "-2 105 put 7.75", "-2 stock 98"],
+            -6.25+1.75+2*7.75+2*98
+    ),
+    (
+            ["+2 35.0 put 9.5", "-2 50.0 put 12.5"],
+            2*(-9.5)+2*12.5
+    ),
+    (
+            ["+2 19.00 call 1.8 2023-04-15", "-1 19.00 put 1.8 2023-06-15"],
+            2*(-1.8)+1.8
+    ),
+])
+def test_position_entry_cost(test_input, expected):
+    pos = Position.from_str_list(test_input)
+    assert pos.entry_cost() == expected

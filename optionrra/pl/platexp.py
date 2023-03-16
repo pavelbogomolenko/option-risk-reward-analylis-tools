@@ -3,17 +3,17 @@ from sys import maxsize
 from optionrra.model import OptionType, Position
 
 
-class PLPriceIntervals:
+class PositionPLAtExpiration:
     LAST_PRICE_INTERVAL_MULTIPLIER = 1.1
 
     def __init__(self, position: Position):
         # we assume contracts in a position are sorted
         self.position = position
-        self.intervals = self.__price_intervals()
+        self.price_intervals = self.__price_intervals()
         self.slopes = self.__slopes()
-        self.adj_intervals = self.__adjusted_price_intervals()
+        self.adj_price_intervals = self.__adjusted_price_intervals()
         self.adj_slopes = self.__adjusted_slopes()
-        self.points = self.__calc_points()
+        self.pl_points = self.__pl_points()
 
     def __price_intervals(self):
         prev_price = self.position.contracts[0].get_price()
@@ -41,13 +41,13 @@ class PLPriceIntervals:
 
     def __slopes(self):
         d = {}
-        for lo, hi in self.intervals:
+        for lo, hi in self.price_intervals:
             d[f"{lo}-{hi}"] = self.__slope_between_interval(lo, hi)
         return d
 
     def __adjusted_slopes(self):
         d = {}
-        for lo, hi in self.adj_intervals:
+        for lo, hi in self.adj_price_intervals:
             d[f"{lo}-{hi}"] = self.__slope_between_interval(lo, hi)
         return d
 
@@ -55,8 +55,8 @@ class PLPriceIntervals:
         slope_direction_count = 0
         prev_slope = maxsize
         intervals = []
-        int_count = len(self.intervals)
-        for i, interval in enumerate(self.intervals):
+        int_count = len(self.price_intervals)
+        for i, interval in enumerate(self.price_intervals):
             lo, hi = interval
             slope = 1
             if self.slopes.get(f"{lo}-{hi}") < 0:
@@ -96,18 +96,18 @@ class PLPriceIntervals:
             return s1 != s2
         return (s1 ^ s2) < 0
 
-    def __calc_points(self):
+    def __pl_points(self):
         points = []
         position_num = len(self.position.contracts)
         pl = self.position.pl_at_strike[self.position.all_strikes[0]]
-        int_len = len(self.adj_intervals)
-        slope_key = f"{self.adj_intervals[0][0]}-{self.adj_intervals[0][1]}"
+        int_len = len(self.adj_price_intervals)
+        slope_key = f"{self.adj_price_intervals[0][0]}-{self.adj_price_intervals[0][1]}"
         first_slope = self.adj_slopes.get(slope_key)
         if first_slope is None:
             raise ValueError("not a valid slope")
 
         prev_slope = ~first_slope + 1
-        for i, interval in enumerate(self.adj_intervals):
+        for i, interval in enumerate(self.adj_price_intervals):
             lo, hi = interval
             slope = self.adj_slopes.get(f"{lo}-{hi}")
 

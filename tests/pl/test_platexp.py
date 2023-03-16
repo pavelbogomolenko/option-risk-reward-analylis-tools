@@ -1,11 +1,11 @@
 import pytest
 
 from optionrra.model import Position
-from optionrra.pl.plpriceintervals import PLPriceIntervals
+from optionrra.pl.platexp import PositionPLAtExpiration
 
 
 def __calc_expected_upper_bound(price):
-    return round(price * PLPriceIntervals.LAST_PRICE_INTERVAL_MULTIPLIER, 2)
+    return round(price * PositionPLAtExpiration.LAST_PRICE_INTERVAL_MULTIPLIER, 2)
 
 
 @pytest.mark.parametrize("test_input, expected", [
@@ -24,7 +24,7 @@ def __calc_expected_upper_bound(price):
 ])
 def test_adj_slopes(test_input, expected):
     position = Position.from_str_list(test_input)
-    intervals = PLPriceIntervals(position)
+    intervals = PositionPLAtExpiration(position)
     assert intervals.adj_slopes == expected
 
 
@@ -60,5 +60,5 @@ def test_adj_slopes(test_input, expected):
 ])
 def test_points(test_input, expected):
     position = Position.from_str_list(test_input)
-    intervals = PLPriceIntervals(position)
-    assert sorted(intervals.points) == sorted(expected)
+    intervals = PositionPLAtExpiration(position)
+    assert sorted(intervals.pl_points) == sorted(expected)

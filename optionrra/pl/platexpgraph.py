@@ -9,12 +9,12 @@ def line_slope(y2, y1, x2, x1):
     return (y2 - y1) / (x2 - x1)
 
 
-class PositionPlGraph:
+class PLAtExpirationGraph:
     HEAD_TAIL_MULT = 0.15
 
-    def __init__(self, title: str, points: list):
+    def __init__(self, title: str, pl_points: list):
         self.title = title
-        self.points = points
+        self.pl_points = pl_points
 
     def __get_x_mult(self, sorted_points: list):
         x_tail, _ = sorted_points[0]
@@ -55,7 +55,7 @@ class PositionPlGraph:
         all_prices = []
         all_x = []
         all_y = []
-        sorted_points = sorted(self.points, key=lambda point: point[0])
+        sorted_points = sorted(self.pl_points, key=lambda point: point[0])
 
         tail, head = self.__calc_tail_and_head_points(sorted_points)
         if len(tail) == 2:

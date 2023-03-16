@@ -1,6 +1,6 @@
 from optionrra.model import ContractType, OptionContract, OptionType, OptionContract, Position
-from optionrra.pl.plpriceintervals import PLPriceIntervals
-from optionrra.pl.plgraph import PositionPlGraph
+from optionrra.pl.platexp import PositionPLAtExpiration
+from optionrra.pl.platexpgraph import PLAtExpirationGraph
 
 if __name__ == "__main__":
 
@@ -40,6 +40,6 @@ if __name__ == "__main__":
     position = Position.from_str_list(contracts)
 
     title = "\n".join(position.to_str_list())
-    pl_intervals = PLPriceIntervals(position)
-    g = PositionPlGraph(title, pl_intervals.points)
+    pos_interval = PositionPLAtExpiration(position)
+    g = PLAtExpirationGraph(title, pos_interval.pl_points)
     g.draw()
