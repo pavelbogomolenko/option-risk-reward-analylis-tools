@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 from dateutil.parser import parse
 from optionrra.model import ContractType, OptionContract, OptionType, Position, StockContract
@@ -207,3 +208,54 @@ def test_position_max_expiration_date():
 def test_position_entry_cost(test_input, expected):
     pos = Position.from_str_list(test_input)
     assert pos.entry_cost() == expected
+
+
+@pytest.mark.parametrize("test_input, expected", [
+    (
+            (["+1 95 call 6.25"], 100),
+            0
+    ),
+    (
+            (["+1 95 put 6.25"], 96),
+            0
+    ),
+    (
+            (["+1 stock 98.0"], 100),
+            2.0
+    ),
+    (
+            (["+2 stock 98.0"], 100),
+            4.0
+    ),
+])
+def test_position_theoretical_value_with_no_expiration_value(test_input, expected):
+    pos = Position.from_str_list(test_input[0])
+    assert pos.theoretical_value(test_input[1], 0.4) == expected
+
+
+@pytest.mark.parametrize("test_input, expected", [
+    (
+            (["+1 70 call 7.9 2023-05-15"], 100, 0.4, 0.05),
+            1.8
+    ),
+    (
+            (["+2 70 put 7.9 2023-05-15"], 100, 0.4, 0.05),
+            2 * 1.8
+    ),
+])
+def test_position_theoretical_value_with_expiration_value(test_input, expected):
+    num_days = 30
+    theor_value = 1.8
+    sigma = test_input[2]
+    r = test_input[3]
+    with patch("optionrra.model.num_workdays_until", return_value=num_days):
+        with patch("optionrra.model.option_value", return_value=theor_value) as option_value_mock:
+            pos = Position.from_str_list(test_input[0])
+            count = pos.contracts[0].count
+            assert pos.theoretical_value(test_input[1], sigma, r) == count * theor_value
+            for c in pos.contracts:
+                option_type = c.subtype().value[0]
+                option_value_mock.assert_called_with(test_input[1], c.get_price(),
+                                                     r, sigma,
+                                                     num_days + 1,
+                                                     option_type)

@@ -7,6 +7,9 @@ from dateutil.parser import parse
 from datetime import datetime
 from typing import List
 
+from optionrra.misc.dateutils import num_workdays_until
+from optionrra.pricing.black_scholes_model import option_value
+
 
 class ContractType(Enum):
     SHORT = 'short'
@@ -40,12 +43,11 @@ class Contract(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def subtype(self) -> ContractSubtype:
+    def in_money_slope(self) -> int:
         raise NotImplementedError
 
-    @property
     @abstractmethod
-    def in_money_slope(self) -> int:
+    def subtype(self) -> ContractSubtype:
         raise NotImplementedError
 
     @abstractmethod
@@ -266,3 +268,25 @@ class Position:
         for c in self.contracts:
             total_cost += c.price_sign() * c.count * c.get_value()
         return total_cost
+
+    def theoretical_value(self, stock_price: float, sigma: float, r: float = 0.05, t: int = 0):
+        """
+        Calculates option position theoretical value
+
+        :param stock_price: Current underlying stock price
+        :param sigma: Standard deviation of stock or underlying contract
+        :param r: risk-free rate
+        :param t: Time to expiration in days
+        :return:
+        """
+        position_value = 0
+        for c in self.contracts:
+            if c.subtype() is None:
+                position_value += c.count * (stock_price - c.get_price())
+            elif c.subtype() == OptionType.CALL or c.subtype() == OptionType.PUT:
+                value = 0
+                if c.expiration_date() is not None:
+                    days = num_workdays_until(c.expiration_date()) + 1 - t
+                    value = option_value(stock_price, c.get_price(), r, sigma, days, c.subtype().value[0])
+                position_value += c.count * value
+        return position_value
