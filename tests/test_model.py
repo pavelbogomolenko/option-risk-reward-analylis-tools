@@ -207,7 +207,7 @@ def test_position_max_expiration_date():
 ])
 def test_position_entry_cost(test_input, expected):
     pos = Position.from_str_list(test_input)
-    assert pos.entry_cost() == expected
+    assert pos.entry_cost == expected
 
 
 @pytest.mark.parametrize("test_input, expected", [

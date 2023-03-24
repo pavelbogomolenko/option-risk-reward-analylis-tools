@@ -5,7 +5,7 @@ from enum import Enum
 from dataclasses import dataclass
 from dateutil.parser import parse
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 from optionrra.misc.dateutils import num_workdays_until
 from optionrra.pricing.black_scholes_model import option_value
@@ -211,25 +211,9 @@ class Position:
         self.all_strikes = self.__get_all_strikes()
         self.min_strike = min(self.all_strikes)
         self.max_strike = max(self.all_strikes)
-        self.pl_at_strike = {}
-        for price in self.all_strikes:
-            self.pl_at_strike[price] = self.pl_at_expiration(price)
-
-        min_exp_date = parse("2199-01-01")
-        max_exp_date = parse("1970-01-01")
-        for c in self.contracts:
-            exp_date = c.expiration_date()
-            if exp_date is None:
-                continue
-
-            if exp_date < min_exp_date:
-                min_exp_date = exp_date
-
-            if exp_date > max_exp_date:
-                max_exp_date = exp_date
-
-        self.min_expiration_date = min_exp_date
-        self.max_expiration_date = max_exp_date
+        self.pl_at_strike = self.__pl_at_strike()
+        self.min_expiration_date, self.max_expiration_date = self.__min_max_exp_date()
+        self.entry_cost = self.__entry_cost()
 
     @staticmethod
     def from_str_list(str_contracts: List[str]) -> Position:
@@ -257,13 +241,35 @@ class Position:
             prev_price = price
         return prices
 
+    def __min_max_exp_date(self) -> Tuple[datetime, datetime]:
+        min_exp_date = parse("2199-01-01")
+        max_exp_date = parse("1970-01-01")
+        for c in self.contracts:
+            exp_date = c.expiration_date()
+            if exp_date is None:
+                continue
+
+            if exp_date < min_exp_date:
+                min_exp_date = exp_date
+
+            if exp_date > max_exp_date:
+                max_exp_date = exp_date
+
+        return min_exp_date, max_exp_date
+
+    def __pl_at_strike(self):
+        res = {}
+        for price in self.all_strikes:
+            res[price] = self.pl_at_expiration(price)
+        return res
+
     def pl_at_expiration(self, exp_price: float):
         total_pl = 0
         for c in self.contracts:
             total_pl += c.pl(exp_price)
         return round(total_pl, 2)
 
-    def entry_cost(self):
+    def __entry_cost(self):
         total_cost = 0
         for c in self.contracts:
             total_cost += c.price_sign() * c.count * c.get_value()
